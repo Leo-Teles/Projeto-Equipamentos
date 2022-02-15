@@ -6,6 +6,7 @@ using Patrimonio.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Patrimonio.Repositories
@@ -19,35 +20,45 @@ namespace Patrimonio.Repositories
         {
             ctx = appContext;
         }
-
         public Usuario Login(string email, string senha)
         {
             var usuario = ctx.Usuarios.FirstOrDefault(u => u.Email == email);
+            var rgx = new Regex(@"^\$\d[a-z]\$\d\d\$.{53}");
 
-
-            if (usuario.Senha.Substring(0)!="$" && usuario.Senha.Substring(3) != "$")
+            if (rgx.IsMatch(usuario.Senha))
             {
-                var U = new UsuariosController(ctx);
-
-                usuario.Senha = Criptografis.GeraHash(usuario.Senha);
-
-                U.PutUsuario(usuario.Id, usuario);
-
-            }
-
-
-            if (usuario != null)
-            {
-                // Com o usuario encontrado temos a hash do banco para poder comparar com a senha vindo do formulário
                 bool comparado = Criptografis.Comparar(senha, usuario.Senha);
                 if (comparado)
                     return usuario;
             }
-
-
-
+            else
+            {
+                AtualizarCripto(usuario, usuario.Id);
+                Login(usuario.Email, usuario.Senha);
+            }
 
             return null;
         }
+
+        public Usuario BuscarPorId(int id)
+        {
+            return ctx.Usuarios.Find(id);
+        }
+
+        public void AtualizarCripto(Usuario usuarioBuscado, int id)
+        {
+            Usuario usuarioNoBanco = BuscarPorId(id);
+
+            string senhaAtualizada = Criptografis.GeraHash(usuarioBuscado.Senha);
+
+            usuarioNoBanco.IdPerfils = usuarioBuscado.IdPerfils;
+            usuarioNoBanco.Senha = senhaAtualizada;
+            usuarioNoBanco.Email = usuarioBuscado.Email;
+
+            ctx.Usuarios.Update(usuarioNoBanco);
+
+            ctx.SaveChanges();
+        }
+
     }
 }
